@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/nmmimport">
+        <file alias="icon_import">resources/import.png</file>
+    </qresource>
+</RCC>
