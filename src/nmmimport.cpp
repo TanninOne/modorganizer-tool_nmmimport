@@ -30,6 +30,8 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include <regex>
 
 
+using namespace MOBase;
+
 
 template <typename T> T resolveFunction(QLibrary &lib, const char *name)
 {

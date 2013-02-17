@@ -29,22 +29,22 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include "modedialog.h"
 
 
-class NMMImport : public IPluginTool
+class NMMImport : public MOBase::IPluginTool
 {
 
   Q_OBJECT
-  Q_INTERFACES(IPlugin IPluginTool)
+  Q_INTERFACES(MOBase::IPlugin MOBase::IPluginTool)
 
 public:
   NMMImport();
 
-  virtual bool init(IOrganizer *moInfo);
+  virtual bool init(MOBase::IOrganizer *moInfo);
   virtual QString name() const;
   virtual QString author() const;
   virtual QString description() const;
-  virtual VersionInfo version() const;
+  virtual MOBase::VersionInfo version() const;
   virtual bool isActive() const;
-  virtual QList<PluginSetting> settings() const;
+  virtual QList<MOBase::PluginSetting> settings() const;
 
   virtual QString displayName() const;
   virtual QString tooltip() const;
@@ -69,16 +69,16 @@ private:
   static QDomNode getNode(const QDomElement &parent, const QString &displayName);
   static QString getTextNodeValue(const QDomElement &parent, const QString &tag);
   static QString getLocalAppFolder();
-  static QString getGameModeName(IGameInfo::Type type);
+  static QString getGameModeName(MOBase::IGameInfo::Type type);
   static bool testInstallLog(const QString &path, QString &problem);
   static bool testModFolder(const QString &path, QString &problem);
 
   QString digForSetting(QDomElement element) const;
   bool determineNMMFolders(QString &installLog, QString &modFolder) const;
 
-  void unpackMissingFiles(const QString &archiveFile, const std::set<QString> &extractFiles, Archive *archive, const QString &modFolder, IModInterface *mod) const;
-  IModInterface *initMod(const QString &modName, const ModInfo &info) const;
-  bool installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, IModInterface *mod, Archive *archive, const QString &modFolder) const;
+  void unpackMissingFiles(const QString &archiveFile, const std::set<QString> &extractFiles, Archive *archive, const QString &modFolder, MOBase::IModInterface *mod) const;
+  MOBase::IModInterface *initMod(const QString &modName, const ModInfo &info) const;
+  bool installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, MOBase::IModInterface *mod, Archive *archive, const QString &modFolder) const;
 
   bool readMods(const QDomDocument &document, std::map<QString, ModInfo> &modsByKey) const;
   bool readFiles(const QDomDocument &document, std::map<QString, ModInfo> &modsByKey) const;
@@ -86,7 +86,7 @@ private:
   void removeModFromInstallLog(QDomDocument &document, const QString &key) const;
 
 private:
-  IOrganizer *m_MOInfo;
+  MOBase::IOrganizer *m_MOInfo;
 
 };
 
