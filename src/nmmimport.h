@@ -85,6 +85,8 @@ private:
   bool parseInstallLog(QDomDocument &document, const QString &installLog, std::map<QString, ModInfo> &modsByKey) const;
   void removeModFromInstallLog(QDomDocument &document, const QString &key) const;
 
+  void transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDocument &document, const QString &installLog, const QString &modFolder) const;
+
 private:
   MOBase::IOrganizer *m_MOInfo;
 
