@@ -174,37 +174,45 @@ IModInterface * NMMImport::initMod(const QString &modName, const ModInfo &info) 
 
 bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, IModInterface *mod, Archive *archive, const QString &modFolder) const
 {
-  bool error = false;
-
   // set of files to extract from the archive because the installed file comes from
   // a different mod (relative to the game-directory, backslashes, lower-case)
   std::set<QString> extractFiles;
 
-  for (auto fileIter = modInfo.files.begin(); fileIter != modInfo.files.end() && !error; ++fileIter) {
+  QDir dataDir(m_MOInfo->gameInfo().path() + "/data");
+
+  QStringList sourceFiles;
+  QStringList destinationFiles;
+
+  for (auto fileIter = modInfo.files.begin(); fileIter != modInfo.files.end(); ++fileIter) {
     QString fileName = QDir::fromNativeSeparators(fileIter->first);
-    QString sourcePath = m_MOInfo->gameInfo().path() + "/" + fileName;
+
     if (fileName.startsWith("Data/", Qt::CaseInsensitive)) {
       fileName.remove(0, 5);
     } else {
       qWarning("file doesn't start with Data/: %s", qPrintable(fileName));
+      continue;
     }
-    bool res = false;
     if (fileIter->second) {
-      if (mode == ModeDialog::MODE_MOVE) {
-        res = moveFileRecursive(sourcePath, mod->absolutePath(), fileName);
-      } else {
-        res = copyFileRecursive(sourcePath, mod->absolutePath(), fileName);
-      }
+      QString sourcePath = dataDir.absoluteFilePath(fileName);
+      sourceFiles.append(sourcePath);
+      destinationFiles.append(mod->absolutePath() + "/" + dataDir.relativeFilePath(sourcePath));
     } else {
       extractFiles.insert(fileIter->first.mid(0).toLower());
       qWarning("extract \"%s\" from \"%s\"",
                qPrintable(fileIter->first), qPrintable(modInfo.installFile));
-      res = true;
     }
-    if (!res) {
-      reportError(tr("Import failed at mod \"%1\".").arg(modInfo.name));
-      error = true;
-    }
+  }
+
+  bool error = false;
+
+  if (mode == ModeDialog::MODE_MOVE) {
+    error = !shellMove(sourceFiles, destinationFiles, parentWidget());
+  } else {
+    error = !shellCopy(sourceFiles, destinationFiles, parentWidget());
+  }
+
+  if (error) {
+    reportError(tr("Import failed at mod \"%1\": %2").arg(modInfo.name).arg(windowsErrorString(::GetLastError())));
   }
 
   if (extractFiles.size() != 0) {
@@ -225,27 +233,9 @@ bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode,
 }
 
 
-void NMMImport::display() const
+void NMMImport::transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDocument &document,
+                             const QString &installLog, const QString &modFolder) const
 {
-  QString installLog;
-  QString modFolder;
-  if (!determineNMMFolders(installLog, modFolder)) {
-    return;
-  }
-
-  installLog.append("/InstallLog.xml");
-  std::map<QString, ModInfo> modsByKey;
-  QDomDocument document("InstallLog");
-
-  if (!parseInstallLog(document, installLog, modsByKey)) {
-    return;
-  }
-
-  if (modsByKey.size() == 1) {
-    QMessageBox::information(parentWidget(), tr("Nothing to import"),
-                             tr("There are no mods installed by NMM."), QMessageBox::Ok);
-    return;
-  }
 
   // query which mods to transfer
   ModSelectionDialog modsDialog(parentWidget());
@@ -289,7 +279,6 @@ void NMMImport::display() const
   progress.show();
 
   bool error = false;
-qDebug("%d mods", enabledMods.size());
   for (auto iter = enabledMods.begin(); iter != enabledMods.end() && !error; ++iter) {
     auto modIter = modsByKey.find(*iter);
     if (modIter == modsByKey.end()) {
@@ -298,7 +287,6 @@ qDebug("%d mods", enabledMods.size());
     }
 
     QString modName = modIter->second.name;
-qDebug("%s", qPrintable(modName));
     progress.setLabelText(modName);
     bool ok = true;
     while (m_MOInfo->getMod(modName) != NULL) {
@@ -340,6 +328,45 @@ qDebug("%s", qPrintable(modName));
   }
   installFile.close();
   progress.hide();
+}
+
+
+void NMMImport::display() const
+{
+  QString installLog;
+  QString modFolder;
+  if (!determineNMMFolders(installLog, modFolder)) {
+    return;
+  }
+
+  installLog.append("/InstallLog.xml");
+  std::map<QString, ModInfo> modsByKey;
+  QDomDocument document("InstallLog");
+
+  if (!parseInstallLog(document, installLog, modsByKey)) {
+    return;
+  }
+
+  if (modsByKey.size() > 1) {
+    transferMods(modsByKey, document, installLog, modFolder);
+  } else {
+    QMessageBox::information(parentWidget(), tr("Nothing to import"),
+                             tr("There are no mods installed by NMM."), QMessageBox::Ok);
+  }
+
+  if (QMessageBox::question(parentWidget(), tr("Import Downloads?"),
+          tr("Do you want to import the mod archives downloaded through NMM?"),
+          QMessageBox::Yes | QMessageBox::No) == QMessageBox::Yes) {
+    QStringList sources;
+    sources.append(QDir::fromNativeSeparators(modFolder)+ "/*.7z");
+    sources.append(QDir::fromNativeSeparators(modFolder)+ "/*.zip");
+    sources.append(QDir::fromNativeSeparators(modFolder)+ "/*.rar");
+    sources.append(QDir::fromNativeSeparators(modFolder)+ "/*.fomod");
+
+    if (!shellCopy(sources, QStringList(m_MOInfo->downloadsPath()), parentWidget())) {
+      qWarning("failed to copy archives to MO download directory: %s", qPrintable(windowsErrorString(::GetLastError())));
+    }
+  }
 }
 
 
