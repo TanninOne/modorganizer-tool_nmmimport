@@ -29,7 +29,7 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include "modedialog.h"
 
 
-class NMMImport : public MOBase::IPluginTool
+class NMMImport : public QObject, MOBase::IPluginTool
 {
 
   Q_OBJECT
