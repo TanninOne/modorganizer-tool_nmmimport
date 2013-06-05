@@ -153,12 +153,12 @@ void NMMImport::unpackMissingFiles(const QString &archiveFile, const std::set<QS
   archive->close();
 }
 
-IModInterface * NMMImport::initMod(const QString &modName, const ModInfo &info) const
+IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) const
 {
   static std::tr1::regex exp("([a-zA-Z0-9_\\- ]*?)([-_ ]V?[0-9_]+)?-([1-9][0-9]+).*");
 
-
-  IModInterface *mod = m_MOInfo->createMod(modName);
+  GuessedValue<QString> temp(modName);
+  IModInterface *mod = m_MOInfo->createMod(temp);
   mod->setVersion(VersionInfo(info.version));
 
   std::tr1::match_results<std::string::const_iterator> result;
