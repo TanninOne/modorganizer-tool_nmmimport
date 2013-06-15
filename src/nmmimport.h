@@ -34,6 +34,9 @@ class NMMImport : public MOBase::IPluginTool
 
   Q_OBJECT
   Q_INTERFACES(MOBase::IPlugin MOBase::IPluginTool)
+#if QT_VERSION >= QT_VERSION_CHECK(5,0,0)
+  Q_PLUGIN_METADATA(IID "org.tannin.NMMImport" FILE "nmmimport.json")
+#endif
 
 public:
   NMMImport();

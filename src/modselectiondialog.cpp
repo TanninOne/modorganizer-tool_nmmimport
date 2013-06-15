@@ -25,9 +25,9 @@ ModSelectionDialog::ModSelectionDialog(QWidget *parent) :
   ui(new Ui::ModSelectionDialog)
 {
   ui->setupUi(this);
-  ui->modsList->header()->setResizeMode(0, QHeaderView::Stretch);
-  ui->modsList->header()->setResizeMode(1, QHeaderView::Fixed);
-  ui->modsList->header()->setResizeMode(2, QHeaderView::Fixed);
+  ui->modsList->header()->setSectionResizeMode(0, QHeaderView::Stretch);
+  ui->modsList->header()->setSectionResizeMode(1, QHeaderView::Fixed);
+  ui->modsList->header()->setSectionResizeMode(2, QHeaderView::Fixed);
   ui->modsList->header()->resizeSection(1, 80);
   ui->modsList->header()->resizeSection(2, 80);
 }

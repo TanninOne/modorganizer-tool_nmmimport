@@ -530,7 +530,7 @@ QString NMMImport::getLocalAppFolder()
     return QString();
   }
 
-  return QDir::fromNativeSeparators(QString::fromUtf16(expanded));
+  return QDir::fromNativeSeparators(ToQString(expanded));
 }
 
 
@@ -714,5 +714,6 @@ bool NMMImport::parseInstallLog(QDomDocument &document, const QString &installLo
   return true;
 }
 
-
+#if QT_VERSION < QT_VERSION_CHECK(5,0,0)
 Q_EXPORT_PLUGIN2(NMMImport, NMMImport)
+#endif

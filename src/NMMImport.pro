@@ -7,12 +7,16 @@
 TARGET = NMMImport
 TEMPLATE = lib
 
+contains(QT_VERSION, "^5.*") {
+  QT += widgets
+}
 QT += xml
 
 CONFIG += plugins
 CONFIG += dll
 
 DEFINES += NMMIMPORT_LIBRARY
+DEFINES += NOMINMAX
 
 SOURCES += nmmimport.cpp \
     modselectiondialog.cpp \
@@ -37,3 +41,6 @@ INCLUDEPATH += ../../archive
 LIBS += -ladvapi32
 
 include(../plugin_template.pri)
+
+OTHER_FILES += \
+    nmmimport.json
