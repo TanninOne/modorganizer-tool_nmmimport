@@ -489,7 +489,7 @@ bool NMMImport::readFiles(const QDomDocument &document, std::map<QString, ModInf
         QString key = sourceEle.attribute("key");
         std::map<QString, ModInfo>::iterator iter = modsByKey.find(key);
         if (iter == modsByKey.end()) {
-          throw MyException(tr("data file \"%1\" references undeclared mod (key \"%2\")").arg(path).arg(key));
+          qWarning("NMM Importer: data file \"%s\" references undeclared mod (key \"%s\")", qPrintable(path), qPrintable(key));
         }
         // ASSUMPTION: mod is the primary source if it's the last in the list
         iter->second.files.push_back(std::make_pair(path, sourceEle == mods.lastChildElement()));
