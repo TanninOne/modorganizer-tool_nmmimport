@@ -159,6 +159,9 @@ IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) c
 
   GuessedValue<QString> temp(modName);
   IModInterface *mod = m_MOInfo->createMod(temp);
+  if (mod == NULL) {
+    return NULL;
+  }
   mod->setVersion(VersionInfo(info.version));
 
   std::tr1::match_results<std::string::const_iterator> result;
@@ -304,6 +307,9 @@ void NMMImport::transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDo
 
     // init new MO mod
     IModInterface *mod = initMod(modName, modIter->second);
+    if (mod == NULL) {
+      return;
+    }
 
     if (installMod(modIter->second, modeDialog.getMode(), mod, archive, modFolder)) {
       if (( modeDialog.getMode() == ModeDialog::MODE_COPYDELETE) || ( modeDialog.getMode() == ModeDialog::MODE_MOVE)) {
