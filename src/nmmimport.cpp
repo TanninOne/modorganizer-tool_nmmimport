@@ -185,7 +185,6 @@ bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode,
 
   QStringList sourceFiles;
   QStringList destinationFiles;
-
   for (auto fileIter = modInfo.files.begin(); fileIter != modInfo.files.end(); ++fileIter) {
     QString fileName = QDir::fromNativeSeparators(fileIter->first);
 
@@ -290,12 +289,16 @@ void NMMImport::transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDo
     }
 
     QString modName = modIter->second.name;
+    if (!fixDirectoryName(modName)) {
+      modName.clear();
+    }
     progress.setLabelText(modName);
     bool ok = true;
-    while (m_MOInfo->getMod(modName) != NULL) {
+    while (modName.isEmpty() || (m_MOInfo->getMod(modName) != NULL)) {
       modName = QInputDialog::getText(parentWidget(), tr("Mod exists!"),
-          tr("A mod with this name already exists, please enter a new name or press "
+          tr("A mod with this name already exists or the name is invalid, please enter a new name or press "
              "\"Cancel\" to skip import of this mod."), QLineEdit::Normal, modName, &ok);
+      fixDirectoryName(modName);
       if (!ok || modName.isEmpty()) {
         ok = false;
         break;
@@ -312,7 +315,7 @@ void NMMImport::transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDo
     }
 
     if (installMod(modIter->second, modeDialog.getMode(), mod, archive, modFolder)) {
-      if (( modeDialog.getMode() == ModeDialog::MODE_COPYDELETE) || ( modeDialog.getMode() == ModeDialog::MODE_MOVE)) {
+      if ((modeDialog.getMode() == ModeDialog::MODE_COPYDELETE) || ( modeDialog.getMode() == ModeDialog::MODE_MOVE)) {
         removeModFromInstallLog(document, *iter);
       }
     } else {
@@ -664,9 +667,9 @@ bool NMMImport::determineNMMFolders(QString &installLog, QString &modFolder) con
       for (QDomElement iter = node.firstChildElement("setting");
            iter != node.lastChildElement("setting"); iter = iter.nextSiblingElement("setting")) {
         if (iter.attribute("name") == "ModFolder") {
-          modFolder = digForSetting(iter);
+          modFolder = QDir::fromNativeSeparators(digForSetting(iter));
         } else if (iter.attribute("name") == "InstallInfoFolder") {
-          installLog = digForSetting(iter);
+          installLog = QDir::fromNativeSeparators(digForSetting(iter));
         }
       }
     }
