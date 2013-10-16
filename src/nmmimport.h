@@ -69,8 +69,8 @@ private:
 
 private:
 
-  static QDomNode getNode(const QDomElement &parent, const QString &displayName);
-  static QString getTextNodeValue(const QDomElement &parent, const QString &tag);
+  static QDomNode getNode(const QDomElement &parent, const QString &displayName, bool mayBeEmpty = false);
+  static QString getTextNodeValue(const QDomElement &parent, const QString &tag, bool mayBeEmpty = false);
   static QString getLocalAppFolder();
   static QString getGameModeName(MOBase::IGameInfo::Type type);
   static bool testInstallLog(const QString &path, QString &problem);
@@ -79,16 +79,17 @@ private:
   QString digForSetting(QDomElement element) const;
   bool determineNMMFolders(QString &installLog, QString &modFolder) const;
 
+  void unpackFiles(const QString &archiveFile, const QString &outputDirectory, const std::set<QString> &extractFiles, Archive *archive) const;
   void unpackMissingFiles(const QString &archiveFile, const std::set<QString> &extractFiles, Archive *archive, const QString &modFolder, MOBase::IModInterface *mod) const;
   MOBase::IModInterface *initMod(const QString &modName, const ModInfo &info) const;
   bool installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, MOBase::IModInterface *mod, Archive *archive, const QString &modFolder) const;
 
-  bool readMods(const QDomDocument &document, std::map<QString, ModInfo> &modsByKey) const;
-  bool readFiles(const QDomDocument &document, std::map<QString, ModInfo> &modsByKey) const;
-  bool parseInstallLog(QDomDocument &document, const QString &installLog, std::map<QString, ModInfo> &modsByKey) const;
+  bool readMods(const QDomDocument &document, std::vector<std::pair<QString, ModInfo>> &modList) const;
+  bool readFiles(const QDomDocument &document, std::vector<std::pair<QString, ModInfo>> &modList) const;
+  bool parseInstallLog(QDomDocument &document, const QString &installLog, std::vector<std::pair<QString, ModInfo> > &modList) const;
   void removeModFromInstallLog(QDomDocument &document, const QString &key) const;
 
-  void transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDocument &document, const QString &installLog, const QString &modFolder) const;
+  void transferMods(const std::vector<std::pair<QString, ModInfo>> &modList, QDomDocument &document, const QString &installLog, const QString &modFolder) const;
 
 private:
   MOBase::IOrganizer *m_MOInfo;

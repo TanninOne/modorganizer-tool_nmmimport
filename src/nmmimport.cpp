@@ -70,7 +70,7 @@ QString NMMImport::description() const
 
 VersionInfo NMMImport::version() const
 {
-  return "0.0.1";
+  return VersionInfo(0, 1, 0, VersionInfo::RELEASE_BETA);
 }
 
 bool NMMImport::isActive() const
@@ -123,12 +123,13 @@ void report7ZipError(LPCWSTR errorMessage)
 }
 
 
-void NMMImport::unpackMissingFiles(const QString &archiveFile, const std::set<QString> &extractFiles, Archive *archive, const QString &modFolder, IModInterface *mod) const
+void NMMImport::unpackFiles(const QString &archiveFile, const QString &outputDirectory,
+                            const std::set<QString> &extractFiles, Archive *archive) const
 {
-  if (!archive->open(ToWString(QDir::toNativeSeparators(modFolder + "/" + archiveFile)).c_str(),
-                     new FunctionCallback<void, LPSTR>(&queryPassword))) {
-    reportError(tr("failed top open archive \"%1\": %2").arg(archiveFile).arg(archive->getLastError()));
+  if (!archive->open(ToWString(archiveFile).c_str(), new FunctionCallback<void, LPSTR>(&queryPassword))) {
+    reportError(tr("failed to open archive \"%1\": %2").arg(archiveFile).arg(archive->getLastError()));
   }
+
   FileData* const *data;
   size_t size;
   archive->getFileList(data, size);
@@ -138,19 +139,28 @@ void NMMImport::unpackMissingFiles(const QString &archiveFile, const std::set<QS
       data[i]->setSkip(true);
     } else {
       data[i]->setSkip(false);
-      if (fileName.startsWith("Data/", Qt::CaseInsensitive)) {
+      if ((fileName.startsWith("Data/", Qt::CaseInsensitive)) ||
+          (fileName.startsWith("Data\\", Qt::CaseInsensitive))) {
         fileName.remove(0, 5);
       }
       data[i]->setOutputFileName(ToWString(fileName).c_str());
     }
   }
-  if (!archive->extract(ToWString(QDir::toNativeSeparators(mod->absolutePath())).c_str(),
+  if (!archive->extract(ToWString(outputDirectory).c_str(),
                         new FunctionCallback<void, float>(&updateProgress),
                         new FunctionCallback<void, LPCWSTR>(&updateProgressFile),
                         new FunctionCallback<void, LPCWSTR>(&report7ZipError))) {
     reportError(tr("failed to extract missing files from %1, mod is incomplete: %2").arg(archiveFile).arg(archive->getLastError()));
   }
   archive->close();
+}
+
+
+void NMMImport::unpackMissingFiles(const QString &archiveFile, const std::set<QString> &extractFiles, Archive *archive, const QString &modFolder, IModInterface *mod) const
+{
+  unpackFiles(QDir::toNativeSeparators(modFolder + "/" + archiveFile),
+              QDir::toNativeSeparators(mod->absolutePath()),
+              extractFiles, archive);
 }
 
 IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) const
@@ -165,7 +175,8 @@ IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) c
   mod->setVersion(VersionInfo(info.version));
 
   std::tr1::match_results<std::string::const_iterator> result;
-  if (std::tr1::regex_search(std::string(info.installFile.toUtf8().constData()), result, exp)) {
+  std::string fileName = std::string(info.installFile.toUtf8().constData());
+  if (std::tr1::regex_search(fileName, result, exp)) {
     std::string temp = result[3].str();
     mod->setNexusID(strtol(temp.c_str(), NULL, 10));
   } else {
@@ -175,7 +186,8 @@ IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) c
   return mod;
 }
 
-bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, IModInterface *mod, Archive *archive, const QString &modFolder) const
+bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, IModInterface *mod,
+                           Archive *archive, const QString &modFolder) const
 {
   // set of files to extract from the archive because the installed file comes from
   // a different mod (relative to the game-directory, backslashes, lower-case)
@@ -187,7 +199,6 @@ bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode,
   QStringList destinationFiles;
   for (auto fileIter = modInfo.files.begin(); fileIter != modInfo.files.end(); ++fileIter) {
     QString fileName = QDir::fromNativeSeparators(fileIter->first);
-
     if (fileName.startsWith("Data/", Qt::CaseInsensitive)) {
       fileName.remove(0, 5);
     } else {
@@ -235,14 +246,13 @@ bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode,
 }
 
 
-void NMMImport::transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDocument &document,
+void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &modList, QDomDocument &document,
                              const QString &installLog, const QString &modFolder) const
 {
-
   // query which mods to transfer
   ModSelectionDialog modsDialog(parentWidget());
 
-  for (auto iter = modsByKey.begin(); iter != modsByKey.end(); ++iter) {
+  for (auto iter = modList.begin(); iter != modList.end(); ++iter) {
     if (iter->second.name != "ORIGINAL_VALUE") {
       modsDialog.addMod(iter->first, iter->second.name, iter->second.version, iter->second.files.size());
     }
@@ -280,6 +290,11 @@ void NMMImport::transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDo
   progress.setCancelButton(NULL);
   progress.show();
 
+  std::map<QString, ModInfo> modsByKey;
+  for (auto iter = modList.begin(); iter != modList.end(); ++iter) {
+    modsByKey[iter->first] = iter->second;
+  }
+
   bool error = false;
   for (auto iter = enabledMods.begin(); iter != enabledMods.end() && !error; ++iter) {
     auto modIter = modsByKey.find(*iter);
@@ -314,12 +329,57 @@ void NMMImport::transferMods(const std::map<QString, ModInfo> &modsByKey, QDomDo
       return;
     }
 
+    std::set<QString> extractFiles;
+    extractFiles.insert("data\\fomod\\info.xml");
+    unpackFiles(QDir::toNativeSeparators(modFolder + "/cache/" + modIter->second.installFile + ".zip"),
+                QDir::toNativeSeparators(QDir::tempPath()),
+                extractFiles, archive);
+
+    QString xmlPath = QDir::tempPath() + "/fomod/info.xml";
+    QFile infoXML(xmlPath);
+    if (infoXML.open(QIODevice::ReadOnly)) {
+
+      QDomDocument document("fomod");
+      if (document.setContent(&infoXML)) {
+        QDomElement tlEle = document.documentElement();
+
+        QString nexusID = getTextNodeValue(tlEle, "Id");
+        QString latestVer = getTextNodeValue(tlEle, "LastKnownVersion");
+        QString endorsedString = getTextNodeValue(tlEle, "IsEndorsed");
+        QString categoryId = getTextNodeValue(tlEle, "CategoryId", true);
+qDebug("cat: %s - %s", qPrintable(modIter->second.installFile), qPrintable(categoryId));
+
+        mod->setNexusID(nexusID.toInt());
+        mod->setNewestVersion(latestVer);
+        mod->setIsEndorsed(endorsedString.compare("true", Qt::CaseInsensitive));
+        if (!categoryId.isEmpty()) {
+          mod->addNexusCategory(categoryId.toInt());
+        }
+      } else {
+        qDebug("failed to parse %s", qPrintable(xmlPath));
+      }
+      infoXML.remove();
+    } else {
+      qDebug("failed to open: %s", qPrintable(xmlPath));
+    }
+    // this may fail if the directory isn't empty otherwise. That's ok because it
+    // means the directory wasn't empty before
+    QDir().remove(QDir::tempPath() + "/fomod");
+
     if (installMod(modIter->second, modeDialog.getMode(), mod, archive, modFolder)) {
       if ((modeDialog.getMode() == ModeDialog::MODE_COPYDELETE) || ( modeDialog.getMode() == ModeDialog::MODE_MOVE)) {
         removeModFromInstallLog(document, *iter);
       }
     } else {
       error = true;
+    }
+
+    QString readmeArchive = QDir::toNativeSeparators(modFolder + "/ReadMe/" + modIter->second.installFile);
+    if (QFile::exists(readmeArchive)) {
+qDebug("%s", qPrintable(readmeArchive));
+      unpackFiles(readmeArchive,
+                  QDir::toNativeSeparators(mod->absolutePath() + "/readmes"),
+                  std::set<QString>(), archive);
     }
 
     progress.setValue(progress.value() + 1);
@@ -349,15 +409,15 @@ void NMMImport::display() const
   }
 
   installLog.append("/InstallLog.xml");
-  std::map<QString, ModInfo> modsByKey;
+  std::vector<std::pair<QString, ModInfo>> modList;
   QDomDocument document("InstallLog");
 
-  if (!parseInstallLog(document, installLog, modsByKey)) {
+  if (!parseInstallLog(document, installLog, modList)) {
     return;
   }
 
-  if (modsByKey.size() > 1) {
-    transferMods(modsByKey, document, installLog, modFolder);
+  if (modList.size() > 1) {
+    transferMods(modList, document, installLog, modFolder);
   } else {
     QMessageBox::information(parentWidget(), tr("Nothing to import"),
                              tr("There are no mods installed by NMM."), QMessageBox::Ok);
@@ -379,14 +439,18 @@ void NMMImport::display() const
 }
 
 
-QDomNode NMMImport::getNode(const QDomElement &parent, const QString &name)
+QDomNode NMMImport::getNode(const QDomElement &parent, const QString &name, bool mayBeEmpty)
 {
   if (parent.isNull()) {
     throw MyException(tr("Element missing."));
   }
   QDomNodeList nodes = parent.elementsByTagName(name);
   if (nodes.count() == 0) {
-    throw MyException(tr("Section \"%1\" missing.").arg(name));
+    if (mayBeEmpty) {
+      return QDomNode();
+    } else {
+      throw MyException(tr("Section \"%1\" missing.").arg(name));
+    }
   } else if (nodes.count() > 1) {
     throw MyException(tr("Multiple sections \"%1\", expected only one.").arg(name));
   }
@@ -394,11 +458,15 @@ QDomNode NMMImport::getNode(const QDomElement &parent, const QString &name)
 }
 
 
-QString NMMImport::getTextNodeValue(const QDomElement &parent, const QString &tag)
+QString NMMImport::getTextNodeValue(const QDomElement &parent, const QString &tag, bool mayBeEmpty)
 {
-  QDomNode textNode = getNode(parent, tag);
+  QDomNode textNode = getNode(parent, tag, mayBeEmpty);
   if (textNode.isNull()) {
-    throw MyException(tr("Expected tag \"%1\" below \"%2\"").arg(tag).arg(parent.tagName()));
+    if (mayBeEmpty) {
+      return QString();
+    } else {
+      throw MyException(tr("Expected tag \"%1\" below \"%2\"").arg(tag).arg(parent.tagName()));
+    }
   }
   QDomNodeList childNodes = textNode.childNodes();
   if (childNodes.count() != 1) {
@@ -407,7 +475,11 @@ QString NMMImport::getTextNodeValue(const QDomElement &parent, const QString &ta
 
   QDomText textContent = childNodes.at(0).toText();
   if (textContent.isNull()) {
-    throw MyException(tr("no text in \"%1\" found!").arg(tag));
+    if (mayBeEmpty) {
+      return QString();
+    } else {
+      throw MyException(tr("no text in \"%1\" found!").arg(tag));
+    }
   }
   return textContent.data();
 }
@@ -460,7 +532,7 @@ void NMMImport::removeModFromInstallLog(QDomDocument &document, const QString &k
 }
 
 
-bool NMMImport::readMods(const QDomDocument &document, std::map<QString, ModInfo> &modsByKey) const
+bool NMMImport::readMods(const QDomDocument &document, std::vector<std::pair<QString, ModInfo>> &modKeyList) const
 {
   try {
     QDomNode modList = getNode(document.documentElement(), "modList");
@@ -472,7 +544,8 @@ bool NMMImport::readMods(const QDomDocument &document, std::map<QString, ModInfo
       info.version = getTextNodeValue(ele, "version");
       info.installFile = ele.attribute("path");
 
-      modsByKey[key] = info;
+
+      modKeyList.push_back(std::make_pair(key, info));
     }
     return true;
   } catch (const MyException &e) {
@@ -482,9 +555,15 @@ bool NMMImport::readMods(const QDomDocument &document, std::map<QString, ModInfo
 }
 
 
-bool NMMImport::readFiles(const QDomDocument &document, std::map<QString, ModInfo> &modsByKey) const
+bool NMMImport::readFiles(const QDomDocument &document, std::vector<std::pair<QString, ModInfo>> &modList) const
 {
   try {
+    // create lookup map
+    std::map<QString, std::vector<std::pair<QString, ModInfo>>::iterator> modsByKey;
+    for (auto iter = modList.begin(); iter != modList.end(); ++iter) {
+      modsByKey[iter->first] = iter;
+    }
+
     QDomNodeList files = getNode(document.documentElement(), "dataFiles").childNodes();
     for (int i = 0; i < files.count(); ++i) {
       QDomElement fileEle = files.at(i).toElement();
@@ -496,12 +575,12 @@ bool NMMImport::readFiles(const QDomDocument &document, std::map<QString, ModInf
       QDomNode mods = getNode(fileEle, "installingMods");
       for (QDomElement sourceEle = mods.firstChildElement(); !sourceEle.isNull(); sourceEle = sourceEle.nextSiblingElement()) {
         QString key = sourceEle.attribute("key");
-        std::map<QString, ModInfo>::iterator iter = modsByKey.find(key);
+        auto iter = modsByKey.find(key);
         if (iter == modsByKey.end()) {
           qWarning("NMM Importer: data file \"%s\" references undeclared mod (key \"%s\")", qPrintable(path), qPrintable(key));
         }
         // ASSUMPTION: mod is the primary source if it's the last in the list
-        iter->second.files.push_back(std::make_pair(path, sourceEle == mods.lastChildElement()));
+        iter->second->second.files.push_back(std::make_pair(path, sourceEle == mods.lastChildElement()));
       }
     }
     return true;
@@ -695,7 +774,7 @@ bool NMMImport::determineNMMFolders(QString &installLog, QString &modFolder) con
 
 
 bool NMMImport::parseInstallLog(QDomDocument &document, const QString &installLog,
-                                std::map<QString, ModInfo> &modsByKey) const
+                                std::vector<std::pair<QString, ModInfo>> &modList) const
 {
   QFile installFile(installLog);
   if (!installFile.open(QIODevice::ReadOnly)) {
@@ -712,11 +791,11 @@ bool NMMImport::parseInstallLog(QDomDocument &document, const QString &installLo
     }
   }
 
-  if (!readMods(document, modsByKey)) {
+  if (!readMods(document, modList)) {
     return false;
   }
 
-  if (!readFiles(document, modsByKey)) {
+  if (!readFiles(document, modList)) {
     return false;
   }
 
