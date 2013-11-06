@@ -283,7 +283,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
   }
 
   // do it!
-  std::set<QString> enabledMods = modsDialog.getEnabledMods();
+  std::vector<QString> enabledMods = modsDialog.getEnabledMods();
   QProgressDialog progress(parentWidget());
   progress.setMaximum(enabledMods.size());
   progress.setValue(0);
@@ -347,7 +347,6 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
         QString latestVer = getTextNodeValue(tlEle, "LastKnownVersion");
         QString endorsedString = getTextNodeValue(tlEle, "IsEndorsed");
         QString categoryId = getTextNodeValue(tlEle, "CategoryId", true);
-qDebug("cat: %s - %s", qPrintable(modIter->second.installFile), qPrintable(categoryId));
 
         mod->setNexusID(nexusID.toInt());
         mod->setNewestVersion(latestVer);

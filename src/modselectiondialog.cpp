@@ -61,13 +61,13 @@ void ModSelectionDialog::addMod(const QString &key,const QString &name,
   ui->modsList->addTopLevelItem(newItem);
 }
 
-std::set<QString> ModSelectionDialog::getEnabledMods() const
+std::vector<QString> ModSelectionDialog::getEnabledMods() const
 {
-  std::set<QString> result;
+  std::vector<QString> result;
   for (int i = 0; i < ui->modsList->topLevelItemCount(); ++i) {
     QTreeWidgetItem *item = ui->modsList->topLevelItem(i);
     if (item->checkState(0) == Qt::Checked) {
-      result.insert(item->data(0, Qt::UserRole).toString());
+      result.push_back(item->data(0, Qt::UserRole).toString());
     }
   }
   return result;
