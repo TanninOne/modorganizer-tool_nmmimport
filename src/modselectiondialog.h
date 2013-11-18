@@ -57,6 +57,10 @@ private slots:
 
   void on_continueButton_clicked();
 
+  void on_selectAllButton_clicked();
+
+  void on_deselectAllButton_clicked();
+
 private:
   Ui::ModSelectionDialog *ui;
 };

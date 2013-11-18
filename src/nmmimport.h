@@ -26,6 +26,7 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include <QtXml>
 #include <vector>
 #include <set>
+#include <QProgressDialog>
 #include "modedialog.h"
 
 
@@ -67,6 +68,12 @@ private:
     std::vector<std::pair<QString, bool> > files;
   };
 
+  enum EResult {
+    RES_FAILED,
+    RES_PARTIAL,
+    RES_SUCCESS
+  };
+
 private:
 
   static QDomNode getNode(const QDomElement &parent, const QString &displayName, bool mayBeEmpty = false);
@@ -80,9 +87,8 @@ private:
   bool determineNMMFolders(QString &installLog, QString &modFolder) const;
 
   void unpackFiles(const QString &archiveFile, const QString &outputDirectory, const std::set<QString> &extractFiles, Archive *archive) const;
-  void unpackMissingFiles(const QString &archiveFile, const std::set<QString> &extractFiles, Archive *archive, const QString &modFolder, MOBase::IModInterface *mod) const;
   MOBase::IModInterface *initMod(const QString &modName, const ModInfo &info) const;
-  bool installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, MOBase::IModInterface *mod, Archive *archive, const QString &modFolder) const;
+  EResult installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, MOBase::IModInterface *mod, const QString &modFolder) const;
 
   bool readMods(const QDomDocument &document, std::vector<std::pair<QString, ModInfo>> &modList) const;
   bool readFiles(const QDomDocument &document, std::vector<std::pair<QString, ModInfo>> &modList) const;
@@ -91,8 +97,12 @@ private:
 
   void transferMods(const std::vector<std::pair<QString, ModInfo>> &modList, QDomDocument &document, const QString &installLog, const QString &modFolder) const;
 
+  virtual void setParentWidget(QWidget *widget);
+
 private:
   MOBase::IOrganizer *m_MOInfo;
+
+  QProgressDialog *m_Progress;
 
 };
 

@@ -84,3 +84,17 @@ void ModSelectionDialog::on_cancelButton_clicked()
 {
   reject();
 }
+
+void ModSelectionDialog::on_selectAllButton_clicked()
+{
+  for (int i = 0; i < ui->modsList->topLevelItemCount(); ++i) {
+    ui->modsList->topLevelItem(i)->setCheckState(0, Qt::Checked);
+  }
+}
+
+void ModSelectionDialog::on_deselectAllButton_clicked()
+{
+  for (int i = 0; i < ui->modsList->topLevelItemCount(); ++i) {
+    ui->modsList->topLevelItem(i)->setCheckState(0, Qt::Unchecked);
+  }
+}

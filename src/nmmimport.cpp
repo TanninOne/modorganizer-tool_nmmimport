@@ -44,6 +44,7 @@ template <typename T> T resolveFunction(QLibrary &lib, const char *name)
 
 
 NMMImport::NMMImport()
+: m_Progress(NULL)
 {
 }
 
@@ -70,7 +71,7 @@ QString NMMImport::description() const
 
 VersionInfo NMMImport::version() const
 {
-  return VersionInfo(0, 1, 0, VersionInfo::RELEASE_BETA);
+  return VersionInfo(0, 2, 0, VersionInfo::RELEASE_BETA);
 }
 
 bool NMMImport::isActive() const
@@ -108,14 +109,13 @@ void queryPassword(LPSTR)
 
 void updateProgress(float)
 {
-
+  QCoreApplication::processEvents();
 }
 
 
 void updateProgressFile(LPCWSTR)
 {
 }
-
 
 void report7ZipError(LPCWSTR errorMessage)
 {
@@ -156,12 +156,6 @@ void NMMImport::unpackFiles(const QString &archiveFile, const QString &outputDir
 }
 
 
-void NMMImport::unpackMissingFiles(const QString &archiveFile, const std::set<QString> &extractFiles, Archive *archive, const QString &modFolder, IModInterface *mod) const
-{
-  unpackFiles(QDir::toNativeSeparators(modFolder + "/" + archiveFile),
-              QDir::toNativeSeparators(mod->absolutePath()),
-              extractFiles, archive);
-}
 
 IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) const
 {
@@ -186,33 +180,40 @@ IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) c
   return mod;
 }
 
-bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, IModInterface *mod,
-                           Archive *archive, const QString &modFolder) const
+NMMImport::EResult NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, IModInterface *mod,
+                           const QString &modFolder) const
 {
-  // set of files to extract from the archive because the installed file comes from
-  // a different mod (relative to the game-directory, backslashes, lower-case)
-  std::set<QString> extractFiles;
+  bool incomplete = false;
 
   QDir dataDir(m_MOInfo->gameInfo().path() + "/data");
-
+  QString virtualFolder = modFolder + "/VirtualModActivator";
   QStringList sourceFiles;
   QStringList destinationFiles;
   for (auto fileIter = modInfo.files.begin(); fileIter != modInfo.files.end(); ++fileIter) {
-    QString fileName = QDir::fromNativeSeparators(fileIter->first);
-    if (fileName.startsWith("Data/", Qt::CaseInsensitive)) {
-      fileName.remove(0, 5);
-    } else {
-      qWarning("file doesn't start with Data/: %s", qPrintable(fileName));
-      continue;
-    }
     if (fileIter->second) {
-      QString sourcePath = dataDir.absoluteFilePath(fileName);
+      QString sourcePath = QDir::fromNativeSeparators(fileIter->first);
+      QString destinationPath;
+
+      if (sourcePath.startsWith(virtualFolder, Qt::CaseInsensitive)) {
+        int index = sourcePath.indexOf('/', virtualFolder.size() + 2);
+        destinationPath = mod->absolutePath() + "/" + sourcePath.mid(index);
+      } else {
+        if (sourcePath.startsWith("Data/", Qt::CaseInsensitive)) {
+          // path relative to skyrim base folder
+          sourcePath.remove(0, 5);
+        } else {
+          qWarning("unrecognized file path: %s", qPrintable(sourcePath));
+          incomplete = true;
+          continue;
+        }
+        destinationPath = mod->absolutePath() + "/" + sourcePath;
+        sourcePath = dataDir.absoluteFilePath(sourcePath);
+      }
+
       sourceFiles.append(sourcePath);
-      destinationFiles.append(mod->absolutePath() + "/" + dataDir.relativeFilePath(sourcePath));
+      destinationFiles.append(destinationPath);
     } else {
-      extractFiles.insert(fileIter->first.mid(0).toLower());
-      qWarning("extract \"%s\" from \"%s\"",
-               qPrintable(fileIter->first), qPrintable(modInfo.installFile));
+      incomplete = true;
     }
   }
 
@@ -225,11 +226,7 @@ bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode,
   }
 
   if (error) {
-    reportError(tr("Import failed at mod \"%1\": %2").arg(modInfo.name).arg(windowsErrorString(::GetLastError())));
-  }
-
-  if (extractFiles.size() != 0) {
-    unpackMissingFiles(modInfo.installFile, extractFiles, archive, modFolder, mod);
+    reportError(tr("Problem importing \"%1\", please check if it imported correctly once this process completed: %2").arg(modInfo.name).arg(windowsErrorString(::GetLastError())));
   }
 
   if (!error && (mode == ModeDialog::MODE_COPYDELETE)) {
@@ -242,13 +239,23 @@ bool NMMImport::installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode,
       }
     }
   }
-  return !error;
+  if (error) {
+    return RES_FAILED;
+  } else if (incomplete) {
+    return RES_PARTIAL;
+  } else {
+    return RES_SUCCESS;
+  }
 }
 
 
 void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &modList, QDomDocument &document,
                              const QString &installLog, const QString &modFolder) const
 {
+  if (m_Progress == NULL) {
+    throw MyException("nmm import plugin not correctly initialised.");
+  }
+
   // query which mods to transfer
   ModSelectionDialog modsDialog(parentWidget());
 
@@ -284,16 +291,17 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 
   // do it!
   std::vector<QString> enabledMods = modsDialog.getEnabledMods();
-  QProgressDialog progress(parentWidget());
-  progress.setMaximum(enabledMods.size());
-  progress.setValue(0);
-  progress.setCancelButton(NULL);
-  progress.show();
+  m_Progress->setMaximum(enabledMods.size());
+  m_Progress->setValue(0);
+  m_Progress->setCancelButton(NULL);
+  m_Progress->show();
 
   std::map<QString, ModInfo> modsByKey;
   for (auto iter = modList.begin(); iter != modList.end(); ++iter) {
     modsByKey[iter->first] = iter->second;
   }
+
+  QStringList incompleteMods;
 
   bool error = false;
   for (auto iter = enabledMods.begin(); iter != enabledMods.end() && !error; ++iter) {
@@ -307,7 +315,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     if (!fixDirectoryName(modName)) {
       modName.clear();
     }
-    progress.setLabelText(modName);
+    m_Progress->setLabelText(modName);
     bool ok = true;
     while (modName.isEmpty() || (m_MOInfo->getMod(modName) != NULL)) {
       modName = QInputDialog::getText(parentWidget(), tr("Mod exists!"),
@@ -331,6 +339,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 
     std::set<QString> extractFiles;
     extractFiles.insert("data\\fomod\\info.xml");
+    extractFiles.insert("fomod\\info.xml");
     unpackFiles(QDir::toNativeSeparators(modFolder + "/cache/" + modIter->second.installFile + ".zip"),
                 QDir::toNativeSeparators(QDir::tempPath()),
                 extractFiles, archive);
@@ -338,7 +347,6 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     QString xmlPath = QDir::tempPath() + "/fomod/info.xml";
     QFile infoXML(xmlPath);
     if (infoXML.open(QIODevice::ReadOnly)) {
-
       QDomDocument document("fomod");
       if (document.setContent(&infoXML)) {
         QDomElement tlEle = document.documentElement();
@@ -365,9 +373,13 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     // means the directory wasn't empty before
     QDir().remove(QDir::tempPath() + "/fomod");
 
-    if (installMod(modIter->second, modeDialog.getMode(), mod, archive, modFolder)) {
+    EResult res = installMod(modIter->second, modeDialog.getMode(), mod, modFolder);
+    if (res != RES_FAILED) {
       if ((modeDialog.getMode() == ModeDialog::MODE_COPYDELETE) || ( modeDialog.getMode() == ModeDialog::MODE_MOVE)) {
         removeModFromInstallLog(document, *iter);
+      }
+      if (res == RES_PARTIAL) {
+        incompleteMods.append(modName);
       }
     } else {
       error = true;
@@ -375,16 +387,14 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 
     QString readmeArchive = QDir::toNativeSeparators(modFolder + "/ReadMe/" + modIter->second.installFile);
     if (QFile::exists(readmeArchive)) {
-qDebug("%s", qPrintable(readmeArchive));
       unpackFiles(readmeArchive,
                   QDir::toNativeSeparators(mod->absolutePath() + "/readmes"),
                   std::set<QString>(), archive);
     }
 
-    progress.setValue(progress.value() + 1);
+    m_Progress->setValue(m_Progress->value() + 1);
     m_MOInfo->modDataChanged(mod);
   }
-
   QFile::copy(installLog, installLog.mid(0).append(".backup"));
 
   QFile installFile(installLog);
@@ -395,7 +405,23 @@ qDebug("%s", qPrintable(readmeArchive));
     document.save(textStream, 0);
   }
   installFile.close();
-  progress.hide();
+  m_Progress->hide();
+
+  if (incompleteMods.size() > 0) {
+    QMessageBox::information(parentWidget(), tr("Incomplete Import"),
+      tr("Some mods were only imported partially because some of their files were overwritten during installation of other mods."
+         "Everything should work fine as long as you don't deactivate the mod that did overwrite them."
+         "It's suggested you reinstall these mods soon-ish:") + "<ul><li>" + incompleteMods.join("</li><li>") + "</li></ul>");
+  }
+}
+
+void NMMImport::setParentWidget(QWidget *widget)
+{
+  IPluginTool::setParentWidget(widget);
+  if (m_Progress != NULL) {
+    m_Progress->deleteLater();
+  }
+  m_Progress = new QProgressDialog(widget);
 }
 
 
@@ -413,6 +439,22 @@ void NMMImport::display() const
 
   if (!parseInstallLog(document, installLog, modList)) {
     return;
+  }
+
+  if (!QFile::exists(modFolder + "/VirtualModActivator/VirtualModConfig.xml")) {
+    if (QMessageBox::warning(parentWidget(), tr("Pre-0.5 NMM"),
+          tr("When importing from NMM versions before 0.5 MO can restore only the files installed on disc. This means "
+             "files that exist in multiple mods will be imported into only one (the one installed last)."),
+          QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Cancel) {
+      return;
+    }
+  } else {
+    if (QMessageBox::warning(parentWidget(), tr("Post-0.5 NMM"),
+          tr("At the time this plugin was written, NMM 0.5 was in alpha state and its very possible it's not compatible "
+             "with the Beta/Final version."),
+          QMessageBox::Ok | QMessageBox::Cancel) == QMessageBox::Cancel) {
+      return;
+    }
   }
 
   if (modList.size() > 1) {
