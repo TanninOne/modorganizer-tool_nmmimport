@@ -827,7 +827,7 @@ bool NMMImport::parseInstallLog(QDomDocument &document, const QString &installLo
     bool res = document.setContent(&installFile);
     installFile.close();
     if (!res) {
-      reportError(tr("failed top open InstallLog.xml"));
+      reportError(tr("failed to open InstallLog.xml"));
       return false;
     }
   }
