@@ -71,7 +71,7 @@ QString NMMImport::description() const
 
 VersionInfo NMMImport::version() const
 {
-  return VersionInfo(0, 2, 0, VersionInfo::RELEASE_BETA);
+  return VersionInfo(0, 2, 1, VersionInfo::RELEASE_BETA);
 }
 
 bool NMMImport::isActive() const
@@ -351,9 +351,9 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
       if (document.setContent(&infoXML)) {
         QDomElement tlEle = document.documentElement();
 
-        QString nexusID = getTextNodeValue(tlEle, "Id");
-        QString latestVer = getTextNodeValue(tlEle, "LastKnownVersion");
-        QString endorsedString = getTextNodeValue(tlEle, "IsEndorsed");
+        QString nexusID = getTextNodeValue(tlEle, "Id", true);
+        QString latestVer = getTextNodeValue(tlEle, "LastKnownVersion", true);
+        QString endorsedString = getTextNodeValue(tlEle, "IsEndorsed", true);
         QString categoryId = getTextNodeValue(tlEle, "CategoryId", true);
 
         mod->setNexusID(nexusID.toInt());
