@@ -56,7 +56,7 @@ bool NMMImport::init(IOrganizer *moInfo)
 
 QString NMMImport::name() const
 {
-  return tr("NMM Import");
+  return "NMM Import";
 }
 
 QString NMMImport::author() const
