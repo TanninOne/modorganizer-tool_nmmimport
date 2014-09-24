@@ -44,7 +44,7 @@ template <typename T> T resolveFunction(QLibrary &lib, const char *name)
 
 
 NMMImport::NMMImport()
-: m_Progress(NULL)
+: m_MOInfo(NULL), m_Progress(NULL)
 {
 }
 
