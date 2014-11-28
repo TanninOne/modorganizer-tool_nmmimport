@@ -36,7 +36,7 @@ using namespace MOBase;
 template <typename T> T resolveFunction(QLibrary &lib, const char *name)
 {
   T temp = reinterpret_cast<T>(lib.resolve(name));
-  if (temp == NULL) {
+  if (temp == nullptr) {
     throw std::runtime_error(QObject::tr("invalid archive.dll: %1").arg(lib.errorString()).toLatin1().constData());
   }
   return temp;
@@ -44,7 +44,7 @@ template <typename T> T resolveFunction(QLibrary &lib, const char *name)
 
 
 NMMImport::NMMImport()
-: m_MOInfo(NULL), m_Progress(NULL)
+: m_MOInfo(nullptr), m_Progress(nullptr)
 {
 }
 
@@ -163,8 +163,8 @@ IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) c
 
   GuessedValue<QString> temp(modName);
   IModInterface *mod = m_MOInfo->createMod(temp);
-  if (mod == NULL) {
-    return NULL;
+  if (mod == nullptr) {
+    return nullptr;
   }
   mod->setVersion(VersionInfo(info.version));
 
@@ -172,7 +172,7 @@ IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) c
   std::string fileName = std::string(info.installFile.toUtf8().constData());
   if (std::tr1::regex_search(fileName, result, exp)) {
     std::string temp = result[3].str();
-    mod->setNexusID(strtol(temp.c_str(), NULL, 10));
+    mod->setNexusID(strtol(temp.c_str(), nullptr, 10));
   } else {
     qWarning("no nexus id found in %s", qPrintable(info.installFile));
   }
@@ -252,7 +252,7 @@ NMMImport::EResult NMMImport::installMod(const ModInfo &modInfo, ModeDialog::Ins
 void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &modList, QDomDocument &document,
                              const QString &installLog, const QString &modFolder) const
 {
-  if (m_Progress == NULL) {
+  if (m_Progress == nullptr) {
     throw MyException("nmm import plugin not correctly initialised.");
   }
 
@@ -293,7 +293,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
   std::vector<QString> enabledMods = modsDialog.getEnabledMods();
   m_Progress->setMaximum(enabledMods.size());
   m_Progress->setValue(0);
-  m_Progress->setCancelButton(NULL);
+  m_Progress->setCancelButton(nullptr);
   m_Progress->show();
 
   std::map<QString, ModInfo> modsByKey;
@@ -317,7 +317,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     }
     m_Progress->setLabelText(modName);
     bool ok = true;
-    while (modName.isEmpty() || (m_MOInfo->getMod(modName) != NULL)) {
+    while (modName.isEmpty() || (m_MOInfo->getMod(modName) != nullptr)) {
       modName = QInputDialog::getText(parentWidget(), tr("Mod exists!"),
           tr("A mod with this name already exists or the name is invalid, please enter a new name or press "
              "\"Cancel\" to skip import of this mod."), QLineEdit::Normal, modName, &ok);
@@ -333,7 +333,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 
     // init new MO mod
     IModInterface *mod = initMod(modName, modIter->second);
-    if (mod == NULL) {
+    if (mod == nullptr) {
       return;
     }
 
@@ -418,7 +418,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 void NMMImport::setParentWidget(QWidget *widget)
 {
   IPluginTool::setParentWidget(widget);
-  if (m_Progress != NULL) {
+  if (m_Progress != nullptr) {
     m_Progress->deleteLater();
   }
   m_Progress = new QProgressDialog(widget);
@@ -644,7 +644,7 @@ QString NMMImport::getLocalAppFolder()
   WCHAR temp[MAX_PATH];
   DWORD bufferSize = MAX_PATH;
 
-  errorcode = ::RegQueryValueExW(key, L"Local AppData", NULL, NULL, (LPBYTE)temp, &bufferSize);
+  errorcode = ::RegQueryValueExW(key, L"Local AppData", nullptr, nullptr, (LPBYTE)temp, &bufferSize);
   if (errorcode != ERROR_SUCCESS) {
     return QString();
   }
