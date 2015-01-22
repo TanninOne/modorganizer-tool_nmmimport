@@ -24,6 +24,7 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include <versioninfo.h>
 #include <utility.h>
 #include <report.h>
+#include <imodinterface.h>
 #include <QInputDialog>
 #include <QProgressDialog>
 #include <QMessageBox>

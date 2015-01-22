@@ -23,6 +23,7 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include <iplugintool.h>
 #include <imoinfo.h>
 #include <archive.h>
+#include <igameinfo.h>
 #include <QtXml>
 #include <vector>
 #include <set>
