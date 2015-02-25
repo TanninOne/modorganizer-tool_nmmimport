@@ -227,7 +227,8 @@ NMMImport::EResult NMMImport::installMod(const ModInfo &modInfo, ModeDialog::Ins
   }
 
   if (error) {
-    reportError(tr("Problem importing \"%1\", please check if it imported correctly once this process completed: %2").arg(modInfo.name).arg(windowsErrorString(::GetLastError())));
+    reportError(tr("Problem importing \"%1\", please check if it imported correctly once this "
+                   "process completed: %2").arg(modInfo.name).arg(windowsErrorString(::GetLastError())));
   }
 
   if (!error && (mode == ModeDialog::MODE_COPYDELETE)) {
@@ -276,7 +277,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
   }
 
 
-  QLibrary archiveLib("dlls\\archive.dll");
+  QLibrary archiveLib(qApp->applicationDirPath() + "dlls/archive.dll");
   if (!archiveLib.load()) {
     reportError(tr("archive.dll not loaded: \"%1\"").arg(archiveLib.errorString()));
     return;
