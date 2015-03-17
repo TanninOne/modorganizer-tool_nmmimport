@@ -1,0 +1,36 @@
+Import('qt_env')
+
+env = qt_env.Clone()
+
+modules = [
+    'Core',
+    'Gui',
+    'Xml'
+]
+
+if env['QT_MAJOR_VERSION'] > 4:
+    modules += [ 'Widgets' ]
+
+env.EnableQt4Modules(['Qt' + n for n in modules],
+                     debug = env['CONFIG'] == 'debug')
+
+env.AppendUnique(CPPDEFINES = [
+    'NMMIMPORT_LIBRARY',
+    'NOMINMAX'
+])
+
+env['CPPPATH'] += [ '.' ]
+
+env.RequireLibraries('uibase')
+
+env.AppendUnique(CPPPATH = [
+    '..\\..\\archive',
+])
+
+env.AppendUnique(LIBS = [
+    'advapi32',
+])
+
+env.Uic4(env.Glob('*.ui'))
+lib = env.SharedLibrary('NMMImport', env.Glob('*.cpp') + env.Glob('*.qrc'))
+env.InstallPlugin(lib)

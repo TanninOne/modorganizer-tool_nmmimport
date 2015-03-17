@@ -42,4 +42,5 @@ LIBS += -ladvapi32
 include(../plugin_template.pri)
 
 OTHER_FILES += \
-    nmmimport.json
+    nmmimport.json\
+    SConscript
