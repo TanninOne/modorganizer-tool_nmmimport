@@ -23,3 +23,6 @@ env.Uic4(env.Glob('*.ui'))
 
 lib = env.SharedLibrary('NMMImport', env.Glob('*.cpp') + env.Glob('*.qrc'))
 env.InstallModule(lib)
+
+res = env['QT_USED_MODULES']
+Return('res')
