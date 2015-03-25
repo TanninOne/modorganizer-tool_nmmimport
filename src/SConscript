@@ -19,7 +19,7 @@ env.AppendUnique(LIBS = [
     'advapi32',
 ])
 
-env.Uic4(env.Glob('*.ui'))
+env.Uic(env.Glob('*.ui'))
 
 lib = env.SharedLibrary('NMMImport', env.Glob('*.cpp') + env.Glob('*.qrc'))
 env.InstallModule(lib)
