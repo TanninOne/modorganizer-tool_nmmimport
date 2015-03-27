@@ -1,0 +1,25 @@
+Import('qt_env')
+
+env = qt_env.Clone()
+
+env.EnableQtModules('Xml')
+
+env.AppendUnique(CPPDEFINES = [
+    'NMMIMPORT_LIBRARY',
+    'NOMINMAX'
+])
+
+env['CPPPATH'] += [ '.' ]
+
+env.AppendUnique(CPPPATH = [
+    '..\\..\\archive',
+])
+
+env.AppendUnique(LIBS = [
+    'advapi32',
+])
+
+env.Uic4(env.Glob('*.ui'))
+
+lib = env.SharedLibrary('NMMImport', env.Glob('*.cpp') + env.Glob('*.qrc'))
+env.InstallModule(lib)
