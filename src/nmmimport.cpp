@@ -173,7 +173,7 @@ IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) c
   std::string fileName = std::string(info.installFile.toUtf8().constData());
   if (std::tr1::regex_search(fileName, result, exp)) {
     std::string temp = result[3].str();
-    mod->setNexusID(strtol(temp.c_str(), nullptr, 10));
+    mod->setRepoModID(strtol(temp.c_str(), nullptr, 10));
   } else {
     qWarning("no nexus id found in %s", qPrintable(info.installFile));
   }
@@ -358,7 +358,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
         QString endorsedString = getTextNodeValue(tlEle, "IsEndorsed", true);
         QString categoryId = getTextNodeValue(tlEle, "CategoryId", true);
 
-        mod->setNexusID(nexusID.toInt());
+        mod->setRepoModID(nexusID.toInt());
         mod->setNewestVersion(latestVer);
         mod->setIsEndorsed(endorsedString.compare("true", Qt::CaseInsensitive));
         if (!categoryId.isEmpty()) {
