@@ -277,7 +277,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
   }
 
 
-  QLibrary archiveLib(qApp->applicationDirPath() + "dlls/archive.dll");
+  QLibrary archiveLib(qApp->applicationDirPath() + "/dlls/archive.dll");
   if (!archiveLib.load()) {
     reportError(tr("archive.dll not loaded: \"%1\"").arg(archiveLib.errorString()));
     return;
