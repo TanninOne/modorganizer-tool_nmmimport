@@ -136,15 +136,12 @@ void NMMImport::unpackFiles(const QString &archiveFile, const QString &outputDir
   archive->getFileList(data, size);
   for (size_t i = 0; i < size; ++i) {
     QString fileName = ToQString(data[i]->getFileName()).toLower();
-    if (extractFiles.find(fileName) == extractFiles.end()) {
-      data[i]->setSkip(true);
-    } else {
-      data[i]->setSkip(false);
+    if (extractFiles.find(fileName) != extractFiles.end()) {
       if ((fileName.startsWith("Data/", Qt::CaseInsensitive)) ||
           (fileName.startsWith("Data\\", Qt::CaseInsensitive))) {
         fileName.remove(0, 5);
       }
-      data[i]->setOutputFileName(ToWString(fileName).c_str());
+      data[i]->addOutputFileName(ToWString(fileName).c_str());
     }
   }
   if (!archive->extract(ToWString(outputDirectory).c_str(),
