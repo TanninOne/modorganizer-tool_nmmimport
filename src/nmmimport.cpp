@@ -664,19 +664,6 @@ QString NMMImport::getLocalAppFolder()
   return QDir::fromNativeSeparators(ToQString(expanded));
 }
 
-
-QString NMMImport::getGameModeName(IGameInfo::Type type)
-{
-  switch (type) {
-    case IGameInfo::TYPE_OBLIVION: return "Oblivion";
-    case IGameInfo::TYPE_FALLOUT3: return "Fallout3";
-    case IGameInfo::TYPE_FALLOUTNV: return "FalloutNV";
-    case IGameInfo::TYPE_SKYRIM: return "Skyrim";
-    default: return QString();
-  }
-}
-
-
 QString NMMImport::digForSetting(QDomElement element) const
 {
   /* <setting name="InstallInfoFolder" serializeAs="Xml">
@@ -689,7 +676,7 @@ QString NMMImport::digForSetting(QDomElement element) const
       </value>
   </setting> */
 
-  QString gameModeName = getGameModeName(m_MOInfo->gameInfo().type());
+  QString gameModeName = m_MOInfo->managedGame()->getNexusName();
 
   try {
     QDomNodeList items =
