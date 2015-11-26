@@ -676,7 +676,7 @@ QString NMMImport::digForSetting(QDomElement element) const
       </value>
   </setting> */
 
-  QString gameModeName = m_MOInfo->managedGame()->getNexusName();
+  QString gameModeName = m_MOInfo->managedGame()->getGameShortName();
 
   try {
     QDomNodeList items =
