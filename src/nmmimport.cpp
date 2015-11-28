@@ -45,7 +45,6 @@ template <typename T> T resolveFunction(QLibrary &lib, const char *name)
 
 
 NMMImport::NMMImport()
-: m_MOInfo(nullptr), m_Progress(nullptr)
 {
 }
 
@@ -72,7 +71,7 @@ QString NMMImport::description() const
 
 VersionInfo NMMImport::version() const
 {
-  return VersionInfo(0, 2, 1, VersionInfo::RELEASE_BETA);
+  return VersionInfo(0, 2, 2, VersionInfo::RELEASE_BETA);
 }
 
 bool NMMImport::isActive() const
@@ -152,7 +151,6 @@ void NMMImport::unpackFiles(const QString &archiveFile, const QString &outputDir
   }
   archive->close();
 }
-
 
 
 IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) const
@@ -251,9 +249,7 @@ NMMImport::EResult NMMImport::installMod(const ModInfo &modInfo, ModeDialog::Ins
 void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &modList, QDomDocument &document,
                              const QString &installLog, const QString &modFolder) const
 {
-  if (m_Progress == nullptr) {
-    throw MyException("nmm import plugin not correctly initialised.");
-  }
+  QProgressDialog progress(parentWidget());
 
   // query which mods to transfer
   ModSelectionDialog modsDialog(parentWidget());
@@ -290,10 +286,10 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 
   // do it!
   std::vector<QString> enabledMods = modsDialog.getEnabledMods();
-  m_Progress->setMaximum(enabledMods.size());
-  m_Progress->setValue(0);
-  m_Progress->setCancelButton(nullptr);
-  m_Progress->show();
+  progress.setMaximum(enabledMods.size());
+  progress.setValue(0);
+  progress.setCancelButton(nullptr);
+  progress.show();
 
   std::map<QString, ModInfo> modsByKey;
   for (auto iter = modList.begin(); iter != modList.end(); ++iter) {
@@ -314,7 +310,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     if (!fixDirectoryName(modName)) {
       modName.clear();
     }
-    m_Progress->setLabelText(modName);
+    progress.setLabelText(modName);
     bool ok = true;
     while (modName.isEmpty() || (m_MOInfo->getMod(modName) != nullptr)) {
       modName = QInputDialog::getText(parentWidget(), tr("Mod exists!"),
@@ -391,7 +387,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
                   std::set<QString>(), archive);
     }
 
-    m_Progress->setValue(m_Progress->value() + 1);
+    progress.setValue(progress.value() + 1);
     m_MOInfo->modDataChanged(mod);
   }
   QFile::copy(installLog, installLog.mid(0).append(".backup"));
@@ -404,7 +400,6 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     document.save(textStream, 0);
   }
   installFile.close();
-  m_Progress->hide();
 
   if (incompleteMods.size() > 0) {
     QMessageBox::information(parentWidget(), tr("Incomplete Import"),
@@ -417,10 +412,6 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 void NMMImport::setParentWidget(QWidget *widget)
 {
   IPluginTool::setParentWidget(widget);
-  if (m_Progress != nullptr) {
-    m_Progress->deleteLater();
-  }
-  m_Progress = new QProgressDialog(widget);
 }
 
 

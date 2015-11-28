@@ -101,9 +101,8 @@ private:
   virtual void setParentWidget(QWidget *widget);
 
 private:
-  MOBase::IOrganizer *m_MOInfo;
 
-  QProgressDialog *m_Progress;
+  MOBase::IOrganizer *m_MOInfo { nullptr };
 
 };
 
