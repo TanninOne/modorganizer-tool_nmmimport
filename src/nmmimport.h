@@ -42,6 +42,7 @@ class NMMImport : public MOBase::IPluginTool
 
 public:
   NMMImport();
+  ~NMMImport();
 
   virtual bool init(MOBase::IOrganizer *moInfo);
   virtual QString name() const;
@@ -87,7 +88,7 @@ private:
   QString digForSetting(QDomElement element) const;
   bool determineNMMFolders(QString &installLog, QString &modFolder) const;
 
-  void unpackFiles(const QString &archiveFile, const QString &outputDirectory, const std::set<QString> &extractFiles, Archive *archive) const;
+  void unpackFiles(const QString &archiveFile, const QString &outputDirectory, const std::set<QString> &extractFiles) const;
   MOBase::IModInterface *initMod(const QString &modName, const ModInfo &info) const;
   EResult installMod(const ModInfo &modInfo, ModeDialog::InstallMode mode, MOBase::IModInterface *mod, const QString &modFolder) const;
 
@@ -103,6 +104,8 @@ private:
 private:
 
   MOBase::IOrganizer *m_MOInfo { nullptr };
+
+  Archive *m_ArchiveHandler;
 
 };
 
