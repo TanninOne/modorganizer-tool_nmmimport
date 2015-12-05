@@ -48,8 +48,25 @@ template <typename T> T resolveFunction(QLibrary &lib, const char *name)
 
 
 NMMImport::NMMImport()
-: m_MOInfo(nullptr), m_Progress(nullptr)
 {
+  QLibrary archiveLib(qApp->applicationDirPath() + "/dlls/archive.dll");
+  if (!archiveLib.load()) {
+    throw MyException(tr("archive.dll not loaded: \"%1\"").arg(archiveLib.errorString()));
+  }
+
+  typedef Archive* (*CreateArchiveType)();
+  CreateArchiveType CreateArchiveFunc = resolveFunction<CreateArchiveType>(archiveLib, "CreateArchive");
+
+  m_ArchiveHandler = CreateArchiveFunc();
+  if (!m_ArchiveHandler->isValid()) {
+    throw MyException(tr("incompatible archive.dll: %1").arg(m_ArchiveHandler->getLastError()));
+    return;
+  }
+}
+
+NMMImport::~NMMImport()
+{
+  delete m_ArchiveHandler;
 }
 
 bool NMMImport::init(IOrganizer *moInfo)
@@ -75,7 +92,7 @@ QString NMMImport::description() const
 
 VersionInfo NMMImport::version() const
 {
-  return VersionInfo(0, 2, 1, VersionInfo::RELEASE_BETA);
+  return VersionInfo(0, 2, 2, VersionInfo::RELEASE_BETA);
 }
 
 bool NMMImport::isActive() const
@@ -103,59 +120,45 @@ QIcon NMMImport::icon() const
   return QIcon(":/nmmimport/icon_import");
 }
 
-typedef Archive* (*CreateArchiveType)();
-
-
-void queryPassword(LPSTR)
-{
-}
-
-
 void updateProgress(float)
 {
   QCoreApplication::processEvents();
 }
 
-
-void updateProgressFile(LPCWSTR)
+void report7ZipError(QString const &errorMessage)
 {
-}
-
-void report7ZipError(LPCWSTR errorMessage)
-{
-  reportError(QObject::tr("extraction error: %1").arg(ToQString(errorMessage)));
+  reportError(QObject::tr("extraction error: %1").arg(errorMessage));
 }
 
 
 void NMMImport::unpackFiles(const QString &archiveFile, const QString &outputDirectory,
-                            const std::set<QString> &extractFiles, Archive *archive) const
+                            const std::set<QString> &extractFiles) const
 {
-  if (!archive->open(ToWString(archiveFile).c_str(), new FunctionCallback<void, LPSTR>(&queryPassword))) {
-    reportError(tr("failed to open archive \"%1\": %2").arg(archiveFile).arg(archive->getLastError()));
+  if (!m_ArchiveHandler->open(archiveFile, nullptr)) {
+    reportError(tr("failed to open archive \"%1\": %2").arg(archiveFile).arg(m_ArchiveHandler->getLastError()));
   }
 
   FileData* const *data;
   size_t size;
-  archive->getFileList(data, size);
+  m_ArchiveHandler->getFileList(data, size);
   for (size_t i = 0; i < size; ++i) {
-    QString fileName = ToQString(data[i]->getFileName()).toLower();
+    QString fileName = data[i]->getFileName().toLower();
     if (extractFiles.find(fileName) != extractFiles.end()) {
       if ((fileName.startsWith("Data/", Qt::CaseInsensitive)) ||
           (fileName.startsWith("Data\\", Qt::CaseInsensitive))) {
         fileName.remove(0, 5);
       }
-      data[i]->addOutputFileName(ToWString(fileName).c_str());
+      data[i]->addOutputFileName(fileName);
     }
   }
-  if (!archive->extract(ToWString(outputDirectory).c_str(),
+  if (!m_ArchiveHandler->extract(outputDirectory,
                         new FunctionCallback<void, float>(&updateProgress),
-                        new FunctionCallback<void, LPCWSTR>(&updateProgressFile),
-                        new FunctionCallback<void, LPCWSTR>(&report7ZipError))) {
-    reportError(tr("failed to extract missing files from %1, mod is incomplete: %2").arg(archiveFile).arg(archive->getLastError()));
+                        nullptr,
+                        new FunctionCallback<void, QString const &>(&report7ZipError))) {
+    reportError(tr("failed to extract missing files from %1, mod is incomplete: %2").arg(archiveFile).arg(m_ArchiveHandler->getLastError()));
   }
-  archive->close();
+  m_ArchiveHandler->close();
 }
-
 
 
 IModInterface *NMMImport::initMod(const QString &modName, const ModInfo &info) const
@@ -254,9 +257,7 @@ NMMImport::EResult NMMImport::installMod(const ModInfo &modInfo, ModeDialog::Ins
 void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &modList, QDomDocument &document,
                              const QString &installLog, const QString &modFolder) const
 {
-  if (m_Progress == nullptr) {
-    throw MyException("nmm import plugin not correctly initialised.");
-  }
+  QProgressDialog progress(parentWidget());
 
   // query which mods to transfer
   ModSelectionDialog modsDialog(parentWidget());
@@ -276,27 +277,12 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     return;
   }
 
-
-  QLibrary archiveLib(qApp->applicationDirPath() + "/dlls/archive.dll");
-  if (!archiveLib.load()) {
-    reportError(tr("archive.dll not loaded: \"%1\"").arg(archiveLib.errorString()));
-    return;
-  }
-
-  CreateArchiveType CreateArchiveFunc = resolveFunction<CreateArchiveType>(archiveLib, "CreateArchive");
-
-  Archive *archive = CreateArchiveFunc();
-  if (!archive->isValid()) {
-    reportError(tr("incompatible archive.dll: %1").arg(archive->getLastError()));
-    return;
-  }
-
   // do it!
   std::vector<QString> enabledMods = modsDialog.getEnabledMods();
-  m_Progress->setMaximum(enabledMods.size());
-  m_Progress->setValue(0);
-  m_Progress->setCancelButton(nullptr);
-  m_Progress->show();
+  progress.setMaximum(enabledMods.size());
+  progress.setValue(0);
+  progress.setCancelButton(nullptr);
+  progress.show();
 
   std::map<QString, ModInfo> modsByKey;
   for (auto iter = modList.begin(); iter != modList.end(); ++iter) {
@@ -317,7 +303,7 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     if (!fixDirectoryName(modName)) {
       modName.clear();
     }
-    m_Progress->setLabelText(modName);
+    progress.setLabelText(modName);
     bool ok = true;
     while (modName.isEmpty() || (m_MOInfo->getMod(modName) != nullptr)) {
       modName = QInputDialog::getText(parentWidget(), tr("Mod exists!"),
@@ -342,9 +328,9 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     std::set<QString> extractFiles;
     extractFiles.insert("data\\fomod\\info.xml");
     extractFiles.insert("fomod\\info.xml");
-    unpackFiles(QDir::toNativeSeparators(modFolder + "/cache/" + modIter->second.installFile + ".zip"),
-                QDir::toNativeSeparators(QDir::tempPath()),
-                extractFiles, archive);
+    unpackFiles(modFolder + "/cache/" + modIter->second.installFile + ".zip",
+                QDir::tempPath(),
+                extractFiles);
 
     QString xmlPath = QDir::tempPath() + "/fomod/info.xml";
     QFile infoXML(xmlPath);
@@ -387,14 +373,12 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
       error = true;
     }
 
-    QString readmeArchive = QDir::toNativeSeparators(modFolder + "/ReadMe/" + modIter->second.installFile);
+    QString readmeArchive = modFolder + "/ReadMe/" + modIter->second.installFile;
     if (QFile::exists(readmeArchive)) {
-      unpackFiles(readmeArchive,
-                  QDir::toNativeSeparators(mod->absolutePath() + "/readmes"),
-                  std::set<QString>(), archive);
+      unpackFiles(readmeArchive, mod->absolutePath() + "/readmes", std::set<QString>());
     }
 
-    m_Progress->setValue(m_Progress->value() + 1);
+    progress.setValue(progress.value() + 1);
     m_MOInfo->modDataChanged(mod);
   }
   QFile::copy(installLog, installLog.mid(0).append(".backup"));
@@ -407,7 +391,6 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
     document.save(textStream, 0);
   }
   installFile.close();
-  m_Progress->hide();
 
   if (incompleteMods.size() > 0) {
     QMessageBox::information(parentWidget(), tr("Incomplete Import"),
@@ -420,10 +403,6 @@ void NMMImport::transferMods(const std::vector<std::pair<QString, ModInfo> > &mo
 void NMMImport::setParentWidget(QWidget *widget)
 {
   IPluginTool::setParentWidget(widget);
-  if (m_Progress != nullptr) {
-    m_Progress->deleteLater();
-  }
-  m_Progress = new QProgressDialog(widget);
 }
 
 
