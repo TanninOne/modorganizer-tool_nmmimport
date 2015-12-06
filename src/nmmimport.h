@@ -23,12 +23,13 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include <iplugintool.h>
 #include <imoinfo.h>
 #include <archive.h>
-#include <igameinfo.h>
-#include <QtXml>
-#include <vector>
-#include <set>
-#include <QProgressDialog>
 #include "modedialog.h"
+
+#include <QProgressDialog>
+#include <QtXml>
+
+#include <set>
+#include <vector>
 
 
 class NMMImport : public MOBase::IPluginTool
@@ -81,7 +82,6 @@ private:
   static QDomNode getNode(const QDomElement &parent, const QString &displayName, bool mayBeEmpty = false);
   static QString getTextNodeValue(const QDomElement &parent, const QString &tag, bool mayBeEmpty = false);
   static QString getLocalAppFolder();
-  static QString getGameModeName(MOBase::IGameInfo::Type type);
   static bool testInstallLog(const QString &path, QString &problem);
   static bool testModFolder(const QString &path, QString &problem);
 
