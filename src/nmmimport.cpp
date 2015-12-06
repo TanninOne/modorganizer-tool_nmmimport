@@ -18,6 +18,7 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "nmmimport.h"
+
 #include "modselectiondialog.h"
 #include "modedialog.h"
 #include "nmmpathsdialog.h"
@@ -25,6 +26,8 @@ along with NMM Import plugin.  If not, see <http://www.gnu.org/licenses/>.
 #include <utility.h>
 #include <report.h>
 #include <imodinterface.h>
+#include <iplugingame.h>
+
 #include <QInputDialog>
 #include <QProgressDialog>
 #include <QMessageBox>
@@ -186,7 +189,7 @@ NMMImport::EResult NMMImport::installMod(const ModInfo &modInfo, ModeDialog::Ins
 {
   bool incomplete = false;
 
-  QDir dataDir(m_MOInfo->gameInfo().path() + "/data");
+  QDir dataDir(m_MOInfo->managedGame()->dataDirectory());
   QString virtualFolder = modFolder + "/VirtualModActivator";
   QStringList sourceFiles;
   QStringList destinationFiles;
@@ -234,9 +237,9 @@ NMMImport::EResult NMMImport::installMod(const ModInfo &modInfo, ModeDialog::Ins
   if (!error && (mode == ModeDialog::MODE_COPYDELETE)) {
     // copy successful, iterate again over all files and remove them
     for (auto fileIter = modInfo.files.begin(); fileIter != modInfo.files.end() && !error; ++fileIter) {
-      QString fileName = QDir::fromNativeSeparators(fileIter->first);
-      QString sourcePath = m_MOInfo->gameInfo().path() + "/" + fileName;
       if (fileIter->second) {
+        QString fileName = QDir::fromNativeSeparators(fileIter->first);
+        QString sourcePath = m_MOInfo->managedGame()->gameDirectory().absoluteFilePath(fileName);
         QFile(sourcePath).remove();
       }
     }
@@ -640,19 +643,6 @@ QString NMMImport::getLocalAppFolder()
   return QDir::fromNativeSeparators(ToQString(expanded));
 }
 
-
-QString NMMImport::getGameModeName(IGameInfo::Type type)
-{
-  switch (type) {
-    case IGameInfo::TYPE_OBLIVION: return "Oblivion";
-    case IGameInfo::TYPE_FALLOUT3: return "Fallout3";
-    case IGameInfo::TYPE_FALLOUTNV: return "FalloutNV";
-    case IGameInfo::TYPE_SKYRIM: return "Skyrim";
-    default: return QString();
-  }
-}
-
-
 QString NMMImport::digForSetting(QDomElement element) const
 {
   /* <setting name="InstallInfoFolder" serializeAs="Xml">
@@ -665,7 +655,7 @@ QString NMMImport::digForSetting(QDomElement element) const
       </value>
   </setting> */
 
-  QString gameModeName = getGameModeName(m_MOInfo->gameInfo().type());
+  QString gameModeName = m_MOInfo->managedGame()->getGameShortName();
 
   try {
     QDomNodeList items =
